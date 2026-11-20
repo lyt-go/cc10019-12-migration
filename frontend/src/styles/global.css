@@ -70,3 +70,19 @@ body { margin: 0; background: #f6f8fb; color: #1f2937; }
 .analysis-chart { display: flex; align-items: flex-end; gap: 8px; height: 160px; padding: 12px 0; }
 .analysis-bar { flex: 1; border-radius: 4px 4px 0 0; background: var(--brand); min-width: 24px; position: relative; transition: height 0.4s; }
 .analysis-bar span { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--muted); white-space: nowrap; }
+/* 枚举迁移与字段版本 */
+.migration-panel { margin-top: 16px; padding: 14px; background: #fff; border: 1px solid var(--border); border-radius: 8px; }
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.panel-head h3 { margin: 0; font-size: 15px; }
+.panel-meta { color: var(--muted); font-size: 12px; }
+.migration-panel tr[data-status="blocked_missing_source"] td { background: #fff7ed; }
+.migration-panel tr[data-status="unmapped"] td,
+.migration-panel tr[data-status="ambiguous"] td { background: #fef2f2; }
+.version-panel { margin-top: 16px; padding: 14px; background: #fff; border: 1px solid var(--border); border-radius: 8px; }
+.version-panel h3 { margin: 0 0 8px; font-size: 15px; }
+.version-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; font-size: 13px; }
+.version-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 12px; }
+.version-badge.state-failed { background: #fee2e2; color: #b42318; }
+.version-badge.state-success { background: #dcfce7; color: #166534; }
+.run-log { max-height: 200px; overflow: auto; font-family: monospace; font-size: 12px; background: #0f172a; color: #e2e8f0; border-radius: 6px; padding: 10px; }
+.run-log div { white-space: pre-wrap; }

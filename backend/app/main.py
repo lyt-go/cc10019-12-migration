@@ -22,6 +22,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+def _module_names() -> set[str]:
+    """从路由定义里取出 /api/<模块> 的模块名。"""
+    names: set[str] = set()
+    for module in ROUTERS:
+        for route in module.router.routes:
+            parts = str(route.path).split("/")
+            if len(parts) > 2 and parts[1] == "api" and parts[2]:
+                names.add(parts[2])
+    return names
+
+
+class ModuleAliasMiddleware:
+    """把前端使用的 /api/<模块_下划线> 映射到后端的 /api/<模块-连字符>。
+
+    只改写模块名这一段，其余路径和查询串原样保留；未登记的模块名继续返回 404。
+    """
+
+    def __init__(self, app_: object) -> None:
+        self.app = app_
+        self.module_names = {name.replace("-", "_") for name in _module_names()}
+
+    async def __call__(self, scope: dict[str, object], receive: object, send: object) -> None:
+        if scope.get("type") == "http":
+            path = str(scope.get("path", ""))
+            parts = path.split("/")
+            if len(parts) > 2 and parts[1] == "api" and parts[2] in self.module_names:
+                parts[2] = parts[2].replace("_", "-")
+                scope = {**scope, "path": "/".join(parts)}
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(ModuleAliasMiddleware)
+
 for module in ROUTERS:
     app.include_router(module.router)
 

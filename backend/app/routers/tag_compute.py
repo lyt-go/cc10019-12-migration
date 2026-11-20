@@ -6,7 +6,17 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 
 from app.schemas import ActionPayload, ActionResult
-from app.services.tag_compute import compute_tag, get_compute_result, list_compute_results, recompute_tag
+from app.services.tag_compute import (
+    ComputeSwitchError,
+    compute_tag,
+    get_compute_result,
+    list_compute_results,
+    list_run_snapshots,
+    recompute_tag,
+    replay_task,
+    request_field_versions,
+    switch_field_versions,
+)
 from app.store import store
 
 router = APIRouter(prefix="/api/tag-compute", tags=["tag_compute"])
@@ -20,6 +30,12 @@ def index(page: int = 1, size: int = 20) -> dict[str, Any]:
     return {"items": rows[start : start + size], "total": total, "page": page, "size": size}
 
 
+
+@router.get("/runs")
+def runs(task_id: str | None = None) -> dict[str, Any]:
+    """计算运行快照：每次尝试实际启用的字段版本与状态。"""
+    items = list_run_snapshots(task_id)
+    return {"items": items, "total": len(items)}
 
 
 @router.get("/export")
@@ -35,12 +51,19 @@ def detail(entry_id: int) -> dict[str, Any]:
 
 
 @router.post("/{task_id}/run")
-def run(task_id: str) -> ActionResult:
+def run(task_id: str, payload: dict[str, Any] | None = None) -> ActionResult:
+    """执行任务；可提交 ``field_versions``，先登记为目标口径再计算。"""
+    requested = (payload or {}).get("field_versions") or {}
     try:
-        result = compute_tag(task_id)
-        return ActionResult(ok=True, message="Computed", entry=result.model_dump())
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        if requested:
+            result = switch_field_versions(task_id, requested)
+        else:
+            result = compute_tag(task_id)
+    except ComputeSwitchError as exc:
+        raise HTTPException(status_code=409, detail={"message": str(exc), "issues": exc.issues})
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return ActionResult(ok=True, message="Computed", entry=result.model_dump())
 
 
 @router.get("/{task_id}/result")
@@ -51,9 +74,31 @@ def result(task_id: str) -> dict[str, Any]:
     return res
 
 
+@router.post("/{task_id}/field-versions")
+def set_field_versions(task_id: str, payload: dict[str, Any]) -> ActionResult:
+    """只登记目标字段版本，不触发计算。"""
+    try:
+        values = request_field_versions(task_id, payload.get("field_versions") or {})
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return ActionResult(ok=True, message="Requested", entry={"field_versions": values})
+
+
 @router.get("/artifacts/all")
 def artifacts() -> list[dict[str, Any]]:
     return list_compute_results()
+
+
+@router.post("/{task_id}/replay")
+def replay(task_id: str) -> ActionResult:
+    """按任务当时记录的字段版本回查，不改变现有口径。"""
+    try:
+        result = replay_task(task_id)
+    except ComputeSwitchError as exc:
+        raise HTTPException(status_code=409, detail={"message": str(exc), "issues": exc.issues})
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return ActionResult(ok=True, message="Replayed", entry=result)
 
 
 @router.post("/{task_id}/recompute")
@@ -62,8 +107,10 @@ def recompute(task_id: str, payload: dict[str, Any] | None = None) -> ActionResu
     try:
         result = recompute_tag(task_id, scope)
         return ActionResult(ok=True, message="Recomputed", entry=result.model_dump())
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except ComputeSwitchError as exc:
+        raise HTTPException(status_code=409, detail={"message": str(exc), "issues": exc.issues})
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.post("/{entry_id}/actions")

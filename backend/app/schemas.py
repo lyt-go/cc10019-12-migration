@@ -47,6 +47,11 @@ class AttrDictEntry(BaseModel):
     attr_name: str = Field(..., description="属性名称")
     data_type: str = Field(..., description="数据类型：string/int/float/bool/datetime/enum")
     enum_values: list[str] = Field(default_factory=list, description="枚举值集")
+    legacy_enum_values: list[str] = Field(default_factory=list, description="第 1 版枚举显示名集")
+    compat_map: list[dict[str, Any]] = Field(
+        default_factory=list, description="兼容映射：display/source/code"
+    )
+    field_version: int = Field(1, description="字段定义版本：1=显示文字，2=稳定代码")
     source: str = Field(..., description="数据来源：event/derived/import")
     update_freq: str = Field(..., description="更新频率：realtime/hourly/daily/weekly")
     attribution: str = Field(..., description="归因方式：first/last/linear")
@@ -65,6 +70,9 @@ class TagDefineEntry(BaseModel):
     tag_name: str = Field(..., description="标签名称")
     tag_level: str = Field(..., description="标签层级：basic/derived/composite")
     compute_logic: str = Field(..., description="计算逻辑表达式")
+    condition_sources: dict[str, str] = Field(
+        default_factory=dict, description="条件里枚举属性的采集来源声明"
+    )
     source_attrs: list[str] = Field(default_factory=list, description="依赖的属性编号列表")
     update_cycle: str = Field(..., description="更新周期")
     coverage_threshold: float = Field(0.0, description="覆盖阈值")
@@ -89,6 +97,8 @@ class TagComputeEntry(BaseModel):
     exec_state: str = Field(..., description="执行状态")
     result_count: int = Field(0, description="计算结果条数")
     error_log: str = Field("", description="错误日志")
+    field_versions: dict[str, int] = Field(default_factory=dict, description="实际启用的字段版本")
+    requested_field_versions: dict[str, int] = Field(default_factory=dict, description="提交的目标字段版本")
 
 
 # ========== 画像卡片 ==========
@@ -397,6 +407,18 @@ class TagComputeResult(BaseModel):
     user_tag_values: list[dict[str, Any]] = Field(default_factory=list)
     output_partition: str = ""
     compute_time_ms: int = 0
+    matched_count: int = 0
+    matched_user_ids: list[str] = Field(default_factory=list)
+    compute_round: int = 0
+    mode: str = "upgrade"
+    condition_snapshot: str = ""
+    condition_used: str = ""
+    requested_field_versions: dict[str, int] = Field(default_factory=dict)
+    field_versions: dict[str, int] = Field(default_factory=dict)
+    resolutions: list[dict[str, Any]] = Field(default_factory=list)
+    declared_sources: dict[str, str] = Field(default_factory=dict)
+    unmapped_user_count: int = 0
+    switch_issues: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class SegmentResult(BaseModel):
